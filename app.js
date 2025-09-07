@@ -3,8 +3,6 @@ const readline = require("readline");
 const chalk = require("chalk");
 const table = require("cli-table3");
 let currentUser;
-let path;
-let userInput;
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -34,7 +32,7 @@ async function adminMenu(option) {
       break;
 
     case "2":
-      displayAllProducts();
+      adminDisplayAllProducts();
       break;
 
     case "3":
@@ -75,7 +73,7 @@ async function userMenu(option) {
 
   switch (option) {
     case "1":
-      displayAllProducts();
+      adminDisplayAllProducts();
       break;
 
     case "2":
@@ -83,7 +81,7 @@ async function userMenu(option) {
       break;
 
     case "3":
-      getAllOrders();
+      getMyOrders();
       break;
     case "4":
       searchOrders();
@@ -143,23 +141,30 @@ async function displayAllProducts() {
     head: ["Product Id", "Product Name", "Price"],
   });
   let allProducts = await readProductsDatabase();
+
   console.log("\nWe have all kinds of products available\n");
   allProducts = allProducts.filter(product => !product.count);
   allProducts
     .slice(0, 11)
     .map(product => newTable.push([product.id, product.name, product.price]));
   console.log(newTable.toString());
-  userInput = (await ask("\nSelect an option to continue: "))
+}
+
+async function adminDisplayAllProducts() {
+  await displayAllProducts();
+  let userResponse = (
+    await ask("\nEnter a valid product Id to see more details: ")
+  )
+    .trim()
+    .toUpperCase()
     .trim()
     .toUpperCase();
-  getSingleProduct(userInput);
+  getSingleProduct(userResponse);
 }
 
 async function getSingleProduct(productId) {
   let allProducts = await readProductsDatabase();
-  let requiredProduct = allProducts.find(
-    product => product.id === productId
-  );
+  let requiredProduct = allProducts.find(product => product.id === productId);
 
   if (!requiredProduct) {
     console.log(chalk.red("\nNo product with this Id was found\n"));
@@ -188,31 +193,51 @@ async function getSingleProduct(productId) {
     } else {
       await welcomeMessage();
     }
-
     return;
   }
-  console.log("product found");
-}
-
-function pagination(option) {
-  switch (option) {
-    case "pg1":
-      break;
-
-    case "pg2":
-      break;
-
-    case "pg3":
-      break;
-
-    default:
-      break;
+  let newTable = new table({
+    head: ["Product Id", "Product Name", "Price", "Description"],
+  });
+  newTable.push([
+    requiredProduct.id,
+    requiredProduct.name,
+    requiredProduct.price,
+    requiredProduct.description,
+  ]);
+  console.log(newTable.toString());
+  if (currentUser && currentUser.isAdmin) {
+    showAdminMenu();
+    let userResponse = await ask("\nWhat else do you wish to do: ");
+    adminMenu(userResponse);
+    // console.log("\n1: Edit product");
+    // let userResponse = await ask(
+    //   "\nSelect 1 to edit or any option to return to menu: "
+    // );
+    // if (userResponse === "1") {
+    //   adminMenu("3");
+    // } else {
+    //   showAdminMenu();
+    //   userResponse = await ask("\nSelect an option to continue: ");
+    //   adminMenu(userResponse);
+    // }
+  } else if (currentUser && !currentUser.isAdmin) {
+    console.log("\n1: Buy product");
+    let userResponse = await ask(
+      "\nSelect 1 to buy or any option to return to menu: "
+    );
+    if (userResponse === "1") {
+      buyProduct(requiredProduct);
+    } else {
+      showUserMenu();
+      userResponse = await ask("\nSelect an option to continue: ");
+      userMenu(userResponse);
+    }
+  } else {
+    console.log("\nLog in or sign up to see more\n");
+    showGeneralMenu();
+    let userResponse = (await ask("\nSelect an option to continue: ")).trim();
+    generalMenu(userResponse);
   }
-}
-function showPagination() {
-  console.log("pg1");
-  console.log("pg1");
-  console.log("pg3");
 }
 
 async function readProductsDatabase() {
@@ -475,27 +500,250 @@ async function editProduct() {
   adminMenu(adminResponse);
 }
 
-async function welcomeMessage() {
-  showGeneralMenu();
+async function buyProduct(product) {
+  console.log("\nWe are here to serve you better\n");
 
-  let userInput = (await ask("Enter an valid option or a valid producId: ")).trim().toUpperCase()
-  console.log(userInput)
-  while (
-    userInput !== "1" &&
-    userInput !== "2" &&
-    userInput !== "3" &&
-    !userInput.includes("PR-")
-  ) {
-    userInput = (await ask("Enter a valid option or a valid product Id: ")).trim().toUpperCase();
+  const usersData = await readUsersDatabase();
+  const admin = usersData.find(user => user.isAdmin);
+  const existingUser = usersData.find(user => user.id === currentUser.id);
+
+  let qty = Number((await ask("Quantity you wish to buy: ")).trim());
+  while (qty < 1 || isNaN(qty)) {
+    qty = Number((await ask("Enter a valid quantity: ")).trim());
+  }
+  const newOrder = {
+    orderId: crypto.randomUUID(),
+    userId: currentUser.id,
+    productName: product.name,
+    Quantity: qty,
+    productPrice: product.price,
+    total: qty * product.price,
+    date: new Date(Date.now()).toLocaleDateString(),
+    orderStatus: "pending",
+  };
+  existingUser.allOrders.push(newOrder);
+  admin.allOrders.push(newOrder);
+
+  await writeUsersDatabase(usersData);
+  console.log(
+    chalk.green(`\nAn order with Id ${newOrder.orderId} has been created\n`)
+  );
+  showUserMenu();
+  let userResponse = await ask("\nWhat else would you love to do? ");
+  userMenu(userResponse);
+}
+
+async function getAllOrders() {
+  const usersData = await readUsersDatabase();
+  const admin = usersData.find(user => user.id === currentUser.id);
+  const pendingOrders =
+    admin.allOrders.length > 0 &&
+    admin.allOrders.filter(order => order.orderStatus === "pending");
+  const completedOrders =
+    admin.allOrders.length > 0 &&
+    admin.allOrders.filter(order => order.orderStatus === "completed");
+  admin.allOrders.length > 0 &&
+    console.log(
+      `There are total of  ${admin.allOrders.length} orders. \n${pendingOrders.length} pending. \n${completedOrders.length} completed\n`
+    );
+
+  let newTable = new table({
+    head: [
+      "Order Id",
+      "User Id",
+      "Order Status",
+      "Date",
+      "Product name",
+      "Product price",
+      "Quantity",
+      "Total",
+    ],
+  });
+  admin.allOrders.length > 0 &&
+    admin.allOrders.forEach(order =>
+      newTable.push([
+        order.orderId,
+        order.userId,
+        order.orderStatus,
+        order.date,
+        order.productName,
+        order.productPrice,
+        order.Quantity,
+        order.total,
+      ])
+    );
+  console.log(newTable.toString());
+  console.log("\n");
+  showAdminMenu();
+  let userResponse = await ask(
+    "\nWhat else do you wish to do? Select an option: "
+  );
+  adminMenu(userResponse);
+}
+
+async function getMyOrders() {
+  const usersData = await readUsersDatabase();
+  const existingUser = usersData.find(user => user.id === currentUser.id);
+
+  const pendingOrders =
+    existingUser.allOrders.length > 0 &&
+    existingUser.allOrders.filter(order => order.orderStatus === "pending");
+  const completedOrders =
+    existingUser.allOrders.length > 0 &&
+    existingUser.allOrders.filter(order => order.orderStatus === "completed");
+  existingUser.allOrders.length > 0 &&
+    console.log(
+      `\nYou have a total of  ${existingUser.allOrders.length} orders. \n${pendingOrders.length} pending. \n${completedOrders.length} completed\n`
+    );
+
+  let newTable = new table({
+    head: [
+      "Order Id",
+      "User Id",
+      "Order Status",
+      "date",
+      "Product name",
+      "Product price",
+      "Quantity",
+      "Total",
+    ],
+  });
+  existingUser.allOrders.length > 0 &&
+    existingUser.allOrders.forEach(order =>
+      newTable.push([
+        order.orderId,
+        order.userId,
+        order.orderStatus,
+        order.date,
+        order.productName,
+        order.productPrice,
+        order.Quantity,
+        order.total,
+      ])
+    );
+  console.log(newTable.toString());
+  console.log("\n");
+  showUserMenu();
+  let userResponse = await ask("\nWhat else do you wish to do: ");
+  userMenu(userResponse);
+}
+
+async function searchOrders() {
+  const usersData = await readUsersDatabase();
+  const existingUser = usersData.find(user => user.id === currentUser.id);
+  let newTable = new table({
+    head: [
+      "Order Id",
+      "User Id",
+      "Order Status",
+      "date",
+      "Product name",
+      "Product price",
+      "Quantity",
+      "Total",
+    ],
+  });
+
+  let userResponse = (await ask("Please enter the order Id: ")).trim();
+
+  const order = existingUser.allOrders.find(
+    order => order.orderId === userResponse
+  );
+  if (order) {
+    newTable.push([
+      order.orderId,
+      order.userId,
+      order.orderStatus,
+      order.date,
+      order.productName,
+      order.productPrice,
+      order.Quantity,
+      order.total,
+    ]);
+    console.log(newTable.toString());
+    console.log("\n");
+  } else {
+    console.log(
+      chalk.red("\nNo order with this Id was found. view all orders instead\n")
+    );
   }
 
-  if (userInput === "1" || userInput === "2" || userInput === "3") {
-    generalMenu(userInput);
-  } else if(userInput.includes("PR-")){
-    getSingleProduct(userInput);
+  showUserMenu();
+  userResponse = await ask("\nSelect an option to continue: ");
+  userMenu(userResponse);
+}
+
+async function getMyPurchase() {
+  const usersData = await readUsersDatabase();
+  const existingUser = usersData.find(user => user.id === currentUser.id);
+  console.log(currentUser)
+  let newTable = new table({
+    head: [
+      "Order Id",
+      "date",
+      "Product name",
+      "Product price",
+      "Quantity",
+      "Total",
+    ],
+  });
+
+  if (existingUser.purchase.length > 0) {
+    existingUser.purchase.forEach(product => {
+      newTable.push([
+        product.orderId,
+        product.date,
+        product.productName,
+        product.productPrice,
+        product.Quantity,
+        product.total,
+      ]);
+    });
+
+    console.log(newTable.toString());
+  } else {
+    console.log(
+      chalk.red("\nYou have not made any purchase or your orders are still pending\n")
+    );
+  }
+  
+  showUserMenu();
+  let userResponse = await ask(
+    "\nWhat else do you wish to do. Select an option to continue: "
+  );
+  userMenu(userResponse);
+}
+
+async function processOrder() {
+  console.log("\nOrder suceesfully processed");
+
+  showAdminMenu();
+  let userResponse = await ask(
+    "\nWhat else do you wish to do. Select an option to continue: "
+  );
+  adminMenu(userResponse);
+}
+
+async function welcomeMessage() {
+  console.log("\nWelcome to CLI Ecommerce\n");
+  showGeneralMenu();
+  await displayAllProducts();
+  let isValid = false;
+  while (!isValid) {
+    let userInput = (await ask("Enter an option or a valid product Id: "))
+      .trim()
+      .toUpperCase();
+
+    if (userInput === "1" || userInput === "2" || userInput === "3") {
+      generalMenu(userInput);
+      isValid = true;
+    } else if (userInput.includes("PR-")) {
+      getSingleProduct(userInput);
+      isValid = true;
+    } else {
+      console.log(chalk.red("\nInvalid input. Please try again.\n"));
+    }
   }
 }
 
 welcomeMessage();
-  console.log("\nWelcome to CLI Ecommerce\n");
-displayAllProducts();
