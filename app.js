@@ -3,6 +3,7 @@ const readline = require("readline");
 const chalk = require("chalk");
 const table = require("cli-table3");
 let currentUser;
+let productUpdate;
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -137,17 +138,20 @@ function showGeneralMenu() {
 }
 
 async function displayAllProducts() {
+  let allProducts = await readProductsDatabase();
+
+  allProducts = allProducts.filter(product => !product.count);
+if(allProducts.length .0 0 ){
   let newTable = new table({
     head: ["Product Id", "Product Name", "Price"],
   });
-  let allProducts = await readProductsDatabase();
-
-  console.log("\nWe have all kinds of products available\n");
-  allProducts = allProducts.filter(product => !product.count);
-  allProducts
+    allProducts
     .slice(0, 11)
     .map(product => newTable.push([product.id, product.name, product.price]));
   console.log(newTable.toString());
+}else{
+  console.log(chalk.red("No product in stock"))
+}
 }
 
 async function adminDisplayAllProducts() {
@@ -205,21 +209,19 @@ async function getSingleProduct(productId) {
     requiredProduct.description,
   ]);
   console.log(newTable.toString());
+  productUpdate = requiredProduct
   if (currentUser && currentUser.isAdmin) {
-    showAdminMenu();
-    let userResponse = await ask("\nWhat else do you wish to do: ");
-    adminMenu(userResponse);
-    // console.log("\n1: Edit product");
-    // let userResponse = await ask(
-    //   "\nSelect 1 to edit or any option to return to menu: "
-    // );
-    // if (userResponse === "1") {
-    //   adminMenu("3");
-    // } else {
-    //   showAdminMenu();
-    //   userResponse = await ask("\nSelect an option to continue: ");
-    //   adminMenu(userResponse);
-    // }
+    console.log("\n1: Edit product");
+    let userResponse = await ask(
+      "\nSelect 1 to edit or any option to return to menu: "
+    );
+    if (userResponse === "1") {
+      adminMenu("3");
+    } else {
+      showAdminMenu();
+      userResponse = await ask("\nSelect an option to continue: ");
+      adminMenu(userResponse);
+    }
   } else if (currentUser && !currentUser.isAdmin) {
     console.log("\n1: Buy product");
     let userResponse = await ask(
@@ -450,7 +452,12 @@ async function addProduct() {
 
 async function editProduct() {
   const allProducts = await readProductsDatabase();
-  let productId = (await ask("\nEnter the product Id: ")).trim().toUpperCase();
+  let productId;
+  if(productUpdate){
+    productId = productUpdate.id
+  }else{
+    productId = (await ask("\nEnter the product Id: ")).trim().toUpperCase();
+  }
   let productToEdit = allProducts.find(product => product.id === productId);
 
   if (!productToEdit) {
@@ -518,7 +525,7 @@ async function buyProduct(product) {
     Quantity: qty,
     productPrice: product.price,
     total: qty * product.price,
-    date: new Date(Date.now()).toLocaleDateString(),
+    date: ( new Date(Date.now())).toLocaleString(),
     orderStatus: "pending",
   };
   existingUser.allOrders.push(newOrder);
@@ -676,7 +683,7 @@ async function searchOrders() {
 async function getMyPurchase() {
   const usersData = await readUsersDatabase();
   const existingUser = usersData.find(user => user.id === currentUser.id);
-  console.log(currentUser)
+  console.log(currentUser);
   let newTable = new table({
     head: [
       "Order Id",
@@ -703,10 +710,12 @@ async function getMyPurchase() {
     console.log(newTable.toString());
   } else {
     console.log(
-      chalk.red("\nYou have not made any purchase or your orders are still pending\n")
+      chalk.red(
+        "\nYou have not made any purchase or your orders are still pending\n"
+      )
     );
   }
-  
+
   showUserMenu();
   let userResponse = await ask(
     "\nWhat else do you wish to do. Select an option to continue: "
@@ -715,14 +724,35 @@ async function getMyPurchase() {
 }
 
 async function processOrder() {
-  console.log("\nOrder suceesfully processed");
+  const usersData = await readUsersDatabase();
+  const admin = usersData.find(user => user.id === currentUser.id);
+
+  let orderId = (await ask("Enter the order Id: ")).trim();
+  while (orderId === "") {
+    orderId = (await ask("Enter the order Id: ")).trim();
+  }
+
+  let orderToUpdate = admin.allOrders.find(order => order.orderId === orderId);
+  if (orderToUpdate) {
+    orderToUpdate.orderStatus = "completed";
+    const orderOwner = usersData.find(user => user.id === orderToUpdate.userId);
+    let theOrder = orderOwner.allOrders.find(
+      order => order.orderId === orderId
+    );
+    theOrder.orderStatus = "completed";
+    orderOwner.purchase.push(theOrder);
+    await writeUsersDatabase(usersData)
+    console.log(chalk.green("\nOrder succesfully processed. OderStatus: completed\n"))
+  } else {
+    console.log(chalk.red("\nNo order with this Id was found\n"))
+  }
 
   showAdminMenu();
   let userResponse = await ask(
     "\nWhat else do you wish to do. Select an option to continue: "
   );
-  adminMenu(userResponse);
 }
+
 
 async function welcomeMessage() {
   console.log("\nWelcome to CLI Ecommerce\n");
