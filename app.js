@@ -140,18 +140,19 @@ function showGeneralMenu() {
 async function displayAllProducts() {
   let allProducts = await readProductsDatabase();
 
-  allProducts = allProducts.filter(product => !product.count);
-if(allProducts.length .0 0 ){
-  let newTable = new table({
-    head: ["Product Id", "Product Name", "Price"],
-  });
+  allProducts = allProducts.filter(product => !Object.hasOwn(product, "count"));
+
+  if (allProducts.length > 0) {
+    let newTable = new table({
+      head: ["Product Id", "Product Name", "Price"],
+    });
     allProducts
-    .slice(0, 11)
-    .map(product => newTable.push([product.id, product.name, product.price]));
-  console.log(newTable.toString());
-}else{
-  console.log(chalk.red("No product in stock"))
-}
+      .slice(0, 11)
+      .map(product => newTable.push([product.id, product.name, product.price]));
+    console.log(newTable.toString());
+  } else {
+    console.log(chalk.red("\nNo product in stock\n"));
+  }
 }
 
 async function adminDisplayAllProducts() {
@@ -209,7 +210,7 @@ async function getSingleProduct(productId) {
     requiredProduct.description,
   ]);
   console.log(newTable.toString());
-  productUpdate = requiredProduct
+  productUpdate = requiredProduct;
   if (currentUser && currentUser.isAdmin) {
     console.log("\n1: Edit product");
     let userResponse = await ask(
@@ -453,9 +454,9 @@ async function addProduct() {
 async function editProduct() {
   const allProducts = await readProductsDatabase();
   let productId;
-  if(productUpdate){
-    productId = productUpdate.id
-  }else{
+  if (productUpdate) {
+    productId = productUpdate.id;
+  } else {
     productId = (await ask("\nEnter the product Id: ")).trim().toUpperCase();
   }
   let productToEdit = allProducts.find(product => product.id === productId);
@@ -473,7 +474,7 @@ async function editProduct() {
   }
 
   let newProductPrice = Number(
-    (await ask(`\nCurrent price: ${productToEdit.price}\nNew price: $`)).trim()
+    (await ask(`\nCurrent price: $${productToEdit.price}\nNew price: $`)).trim()
   );
   while (
     newProductPrice < 1 ||
@@ -505,6 +506,8 @@ async function editProduct() {
   showAdminMenu();
   let adminResponse = await ask("\nWhat do you wish to do next: ");
   adminMenu(adminResponse);
+
+  productUpdate = null;
 }
 
 async function buyProduct(product) {
@@ -525,7 +528,7 @@ async function buyProduct(product) {
     Quantity: qty,
     productPrice: product.price,
     total: qty * product.price,
-    date: ( new Date(Date.now())).toLocaleString(),
+    date: new Date(Date.now()).toLocaleString(),
     orderStatus: "pending",
   };
   existingUser.allOrders.push(newOrder);
@@ -533,7 +536,9 @@ async function buyProduct(product) {
 
   await writeUsersDatabase(usersData);
   console.log(
-    chalk.green(`\nAn order with Id ${newOrder.orderId} has been created\n`)
+    chalk.green(
+      `\nAn order with Order Id ${newOrder.orderId} has been created\n`
+    )
   );
   showUserMenu();
   let userResponse = await ask("\nWhat else would you love to do? ");
@@ -543,30 +548,29 @@ async function buyProduct(product) {
 async function getAllOrders() {
   const usersData = await readUsersDatabase();
   const admin = usersData.find(user => user.id === currentUser.id);
-  const pendingOrders =
-    admin.allOrders.length > 0 &&
-    admin.allOrders.filter(order => order.orderStatus === "pending");
-  const completedOrders =
-    admin.allOrders.length > 0 &&
-    admin.allOrders.filter(order => order.orderStatus === "completed");
-  admin.allOrders.length > 0 &&
+  if (admin.allOrders.length > 0) {
+    const pendingOrders = admin.allOrders.filter(
+      order => order.orderStatus === "pending"
+    );
+    const completedOrders = admin.allOrders.filter(
+      order => order.orderStatus === "completed"
+    );
     console.log(
-      `There are total of  ${admin.allOrders.length} orders. \n${pendingOrders.length} pending. \n${completedOrders.length} completed\n`
+      `\n4There are total of  ${admin.allOrders.length} orders. \n${pendingOrders.length} pending. \n${completedOrders.length} completed\n`
     );
 
-  let newTable = new table({
-    head: [
-      "Order Id",
-      "User Id",
-      "Order Status",
-      "Date",
-      "Product name",
-      "Product price",
-      "Quantity",
-      "Total",
-    ],
-  });
-  admin.allOrders.length > 0 &&
+    let newTable = new table({
+      head: [
+        "Order Id",
+        "User Id",
+        "Order Status",
+        "Date",
+        "Product name",
+        "Product price",
+        "Quantity",
+        "Total",
+      ],
+    });
     admin.allOrders.forEach(order =>
       newTable.push([
         order.orderId,
@@ -579,7 +583,10 @@ async function getAllOrders() {
         order.total,
       ])
     );
-  console.log(newTable.toString());
+    console.log(newTable.toString());
+  } else {
+    console.log(chalk.red("No orders"));
+  }
   console.log("\n");
   showAdminMenu();
   let userResponse = await ask(
@@ -591,44 +598,47 @@ async function getAllOrders() {
 async function getMyOrders() {
   const usersData = await readUsersDatabase();
   const existingUser = usersData.find(user => user.id === currentUser.id);
-
-  const pendingOrders =
+  if (existingUser.allOrders.length > 0) {
+    const pendingOrders =
+      existingUser.allOrders.length > 0 &&
+      existingUser.allOrders.filter(order => order.orderStatus === "pending");
+    const completedOrders =
+      existingUser.allOrders.length > 0 &&
+      existingUser.allOrders.filter(order => order.orderStatus === "completed");
     existingUser.allOrders.length > 0 &&
-    existingUser.allOrders.filter(order => order.orderStatus === "pending");
-  const completedOrders =
-    existingUser.allOrders.length > 0 &&
-    existingUser.allOrders.filter(order => order.orderStatus === "completed");
-  existingUser.allOrders.length > 0 &&
-    console.log(
-      `\nYou have a total of  ${existingUser.allOrders.length} orders. \n${pendingOrders.length} pending. \n${completedOrders.length} completed\n`
-    );
+      console.log(
+        `\nYou have a total of  ${existingUser.allOrders.length} orders. \n${pendingOrders.length} pending. \n${completedOrders.length} completed\n`
+      );
 
-  let newTable = new table({
-    head: [
-      "Order Id",
-      "User Id",
-      "Order Status",
-      "date",
-      "Product name",
-      "Product price",
-      "Quantity",
-      "Total",
-    ],
-  });
-  existingUser.allOrders.length > 0 &&
-    existingUser.allOrders.forEach(order =>
-      newTable.push([
-        order.orderId,
-        order.userId,
-        order.orderStatus,
-        order.date,
-        order.productName,
-        order.productPrice,
-        order.Quantity,
-        order.total,
-      ])
-    );
-  console.log(newTable.toString());
+    let newTable = new table({
+      head: [
+        "Order Id",
+        "User Id",
+        "Order Status",
+        "date",
+        "Product name",
+        "Product price",
+        "Quantity",
+        "Total",
+      ],
+    });
+    existingUser.allOrders.length > 0 &&
+      existingUser.allOrders.forEach(order =>
+        newTable.push([
+          order.orderId,
+          order.userId,
+          order.orderStatus,
+          order.date,
+          order.productName,
+          order.productPrice,
+          order.Quantity,
+          order.total,
+        ])
+      );
+    console.log(newTable.toString());
+  } else {
+    console.log(chalk.red("\nYou have not made any order\n"));
+  }
   console.log("\n");
   showUserMenu();
   let userResponse = await ask("\nWhat else do you wish to do: ");
@@ -651,7 +661,7 @@ async function searchOrders() {
     ],
   });
 
-  let userResponse = (await ask("Please enter the order Id: ")).trim();
+  let userResponse = (await ask("\nPlease enter the order Id: ")).trim();
 
   const order = existingUser.allOrders.find(
     order => order.orderId === userResponse
@@ -683,7 +693,6 @@ async function searchOrders() {
 async function getMyPurchase() {
   const usersData = await readUsersDatabase();
   const existingUser = usersData.find(user => user.id === currentUser.id);
-  console.log(currentUser);
   let newTable = new table({
     head: [
       "Order Id",
@@ -741,10 +750,12 @@ async function processOrder() {
     );
     theOrder.orderStatus = "completed";
     orderOwner.purchase.push(theOrder);
-    await writeUsersDatabase(usersData)
-    console.log(chalk.green("\nOrder succesfully processed. OderStatus: completed\n"))
+    await writeUsersDatabase(usersData);
+    console.log(
+      chalk.green("\nOrder succesfully processed. OderStatus: completed\n")
+    );
   } else {
-    console.log(chalk.red("\nNo order with this Id was found\n"))
+    console.log(chalk.red("\nNo order with this Id was found\n"));
   }
 
   showAdminMenu();
@@ -752,7 +763,6 @@ async function processOrder() {
     "\nWhat else do you wish to do. Select an option to continue: "
   );
 }
-
 
 async function welcomeMessage() {
   console.log("\nWelcome to CLI Ecommerce\n");

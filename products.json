@@ -1,5 +1,1 @@
-[
-    {
-        "count": 0
-    }
-]
+[{"count":5},{"id":"PR-1","name":"laptop","price":1000,"description":"This is is a T-shirt"},{"id":"PR-2","name":"glass cup","price":3,"description":"A cup"},{"id":"PR-3","name":"again","price":231,"description":"Your best kind of laptop"},{"id":"PR-4","name":"SamSung phone","price":1000,"description":"Best of it kind"},{"id":"PR-5","name":"cylinder","price":33,"description":"A cooking cylinder"}]
