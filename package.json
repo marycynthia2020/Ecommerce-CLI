@@ -1,0 +1,31 @@
+{
+  "name": "ecommerce",
+  "version": "1.0.0",
+  "description": "This is a simulation of e commerce application that runs on the terminal",
+  "keywords": [
+    "Ecommerce",
+    "buy",
+    "sell",
+    "transacttions",
+    "money"
+  ],
+  "homepage": "https://github.com/marycynthia2020/Ecommerce-CLI#readme",
+  "bugs": {
+    "url": "https://github.com/marycynthia2020/Ecommerce-CLI/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marycynthia2020/Ecommerce-CLI.git"
+  },
+  "license": "ISC",
+  "author": "Chinemerem Ugbaja",
+  "type": "commonjs",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.5"
+  }
+}
