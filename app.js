@@ -26,7 +26,6 @@ function generateProductId(allProducts) {
 }
 
 async function adminMenu(option) {
-  let userResponse;
   switch (option) {
     case "1":
       addProduct();
@@ -54,8 +53,10 @@ async function adminMenu(option) {
 
     default:
       console.log(chalk.red("\nInvalid input"));
-      userInput = await ask("\nPlease select a valid option from the list: ");
-      adminMenu(userResponse);
+      let userInput = await ask(
+        "\nPlease select a valid option from the list: "
+      );
+      adminMenu(userInput);
       break;
   }
 }
@@ -70,8 +71,6 @@ function showAdminMenu() {
 }
 
 async function userMenu(option) {
-  let userResponse;
-
   switch (option) {
     case "1":
       adminDisplayAllProducts();
@@ -94,8 +93,10 @@ async function userMenu(option) {
 
     default:
       console.log(chalk.red("\nInvalid input"));
-      userInput = await ask("\nPlease select a valid option from the list: ");
-      userMenu(userResponse);
+      let userInput = await ask(
+        "\nPlease select a valid option from the list: "
+      );
+      userMenu(userInput);
       break;
   }
 }
@@ -547,7 +548,9 @@ async function buyProduct(product) {
 
 async function getAllOrders() {
   const usersData = await readUsersDatabase();
-  const admin = usersData.find(user => user.id === currentUser.id);
+  const admin = usersData.find(
+    user => user.id === currentUser.id && user.isAdmin === true
+  );
   if (admin.allOrders.length > 0) {
     const pendingOrders = admin.allOrders.filter(
       order => order.orderStatus === "pending"
@@ -556,7 +559,7 @@ async function getAllOrders() {
       order => order.orderStatus === "completed"
     );
     console.log(
-      `\n4There are total of  ${admin.allOrders.length} orders. \n${pendingOrders.length} pending. \n${completedOrders.length} completed\n`
+      `\nThere are total of  ${admin.allOrders.length} orders. \n${pendingOrders.length} pending. \n${completedOrders.length} completed\n`
     );
 
     let newTable = new table({
@@ -635,6 +638,7 @@ async function getMyOrders() {
           order.total,
         ])
       );
+      console.log
     console.log(newTable.toString());
   } else {
     console.log(chalk.red("\nYou have not made any order\n"));
@@ -677,6 +681,7 @@ async function searchOrders() {
       order.Quantity,
       order.total,
     ]);
+    console.log("\nOrder details")
     console.log(newTable.toString());
     console.log("\n");
   } else {
@@ -705,6 +710,8 @@ async function getMyPurchase() {
   });
 
   if (existingUser.purchase.length > 0) {
+
+    console.log("\nThese are all your orders")
     existingUser.purchase.forEach(product => {
       newTable.push([
         product.orderId,
@@ -734,43 +741,86 @@ async function getMyPurchase() {
 
 async function processOrder() {
   const usersData = await readUsersDatabase();
-  const admin = usersData.find(user => user.id === currentUser.id);
+  const admin = usersData.find(
+    user => user.id === currentUser.id && user.isAdmin === true
+  );
 
-  let orderId = (await ask("Enter the order Id: ")).trim();
-  while (orderId === "") {
-    orderId = (await ask("Enter the order Id: ")).trim();
-  }
+  const pendingOrders = admin.allOrders?.filter(
+    order => order.orderStatus === "pending"
+  );
 
-  let orderToUpdate = admin.allOrders.find(order => order.orderId === orderId);
-  if (orderToUpdate) {
-    orderToUpdate.orderStatus = "completed";
-    const orderOwner = usersData.find(user => user.id === orderToUpdate.userId);
-    let theOrder = orderOwner.allOrders.find(
-      order => order.orderId === orderId
-    );
-    theOrder.orderStatus = "completed";
-    orderOwner.purchase.push(theOrder);
-    await writeUsersDatabase(usersData);
+  if (pendingOrders.length > 0) {
     console.log(
-      chalk.green("\nOrder succesfully processed. OderStatus: completed\n")
+      `\nThese are the pending orders. Total: ${pendingOrders.length}\n`
     );
+    let newTable = new table({
+      head: [
+        "Order Id",
+        "User Id",
+        "Order Status",
+        "Date",
+        "Product name",
+        "Product price",
+        "Quantity",
+        "Total",
+      ],
+    });
+    pendingOrders.forEach(order =>
+      newTable.push([
+        order.orderId,
+        order.userId,
+        order.orderStatus,
+        order.date,
+        order.productName,
+        order.productPrice,
+        order.Quantity,
+        order.total,
+      ])
+    );
+    console.log(newTable.toString());
+
+    let orderId = (await ask("\nEnter an order Id to approve it: ")).trim();
+    while (orderId === "") {
+      orderId = (await ask("Enter an order Id: ")).trim();
+    }
+
+    let orderToUpdate = admin.allOrders.find(
+      order => order.orderId === orderId && order.orderStatus === "pending"
+    );
+    if (orderToUpdate) {
+      orderToUpdate.orderStatus = "completed";
+      const orderOwner = usersData.find(
+        user => user.id === orderToUpdate.userId
+      );
+      let theOrder = orderOwner.allOrders.find(
+        order => order.orderId === orderId
+      );
+      theOrder.orderStatus = "completed";
+      orderOwner.purchase.push(theOrder);
+      await writeUsersDatabase(usersData);
+      console.log(
+        chalk.green("\nOrder succesfully processed. OderStatus: completed\n")
+      );
+    } else {
+      console.log(chalk.red("\nNo pending order with this Id was found\n"));
+    }
   } else {
-    console.log(chalk.red("\nNo order with this Id was found\n"));
+    console.log(chalk.red("\nThere are currently no pending order\n"));
   }
 
   showAdminMenu();
   let userResponse = await ask(
     "\nWhat else do you wish to do. Select an option to continue: "
   );
+  adminMenu(userResponse);
 }
 
 async function welcomeMessage() {
-  console.log("\nWelcome to CLI Ecommerce\n");
   showGeneralMenu();
   await displayAllProducts();
   let isValid = false;
   while (!isValid) {
-    let userInput = (await ask("Enter an option or a valid product Id: "))
+    let userInput = (await ask("\nEnter an option or a valid product Id: "))
       .trim()
       .toUpperCase();
 
@@ -786,4 +836,5 @@ async function welcomeMessage() {
   }
 }
 
+console.log("\nWelcome to CLI Ecommerce\n");
 welcomeMessage();
